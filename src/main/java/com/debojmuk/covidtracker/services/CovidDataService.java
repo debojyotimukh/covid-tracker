@@ -6,6 +6,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,7 +22,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CovidDataService {
-    private static String VIRUS_DATA_URL = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/07-17-2021.csv";
+    private static String VIRUS_DATA_URL = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/%s.csv";
 
     private List<LocationStats> allStats = new ArrayList<>();
 
@@ -29,9 +31,15 @@ public class CovidDataService {
     public void fetchVirusData() throws IOException, InterruptedException {
         List<LocationStats> newStats = new ArrayList<>(); // while populating users can still access data
         HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder(URI.create(VIRUS_DATA_URL)).build();
+        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("MM-dd-uuuu"));
+        HttpRequest request = HttpRequest.newBuilder(URI.create(String.format(VIRUS_DATA_URL, today))).build();
 
         HttpResponse<String> httpResponse = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (httpResponse.statusCode() != 200) {
+            String yesterday = LocalDate.now().plusDays(-1).format(DateTimeFormatter.ofPattern("MM-dd-uuuu"));
+            request = HttpRequest.newBuilder(URI.create(String.format(VIRUS_DATA_URL, yesterday))).build();
+            httpResponse = client.send(request, HttpResponse.BodyHandlers.ofString());
+        }
         StringReader stringReader = new StringReader(httpResponse.body());
         Iterable<CSVRecord> records = CSVFormat.RFC4180.withFirstRecordAsHeader().parse(stringReader);
         for (CSVRecord record : records) {
